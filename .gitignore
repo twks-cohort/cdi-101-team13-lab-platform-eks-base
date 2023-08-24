@@ -1,0 +1,9 @@
+kubeconfig_*
+.venv
+.terraform/
+terrform.*
+*.auto.tfvars.json
+.terraform.lock.hcl
+Pipfile.lock
+credentials
+*.ignore
