@@ -1,0 +1,25 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: blue-admin
+  namespace: lab-system-mtls
+subjects:
+  - kind: Group
+    name: "twks-cohort/blue"
+    apiGroup: rbac.authorization.k8s.io
+
+roleRef:
+  kind: Role
+  name: blue-admin
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: lab-system-mtls
+  name: blue-admin
+rules:
+  - apiGroups: [""] # "" indicates the core API group
+    resources: ["*"]
+    verbs: ["*"]
+---
