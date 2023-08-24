@@ -13,11 +13,11 @@ parameters:
   context:
     description: circleci context for all jobs
     type: string
-    default: twdps-core-labs-team
+    default: cohorts
   terraform-version:
     description: terraform version for all jobs
     type: string
-    default: "1.2.2"
+    default: "1.3.3"
   executor-image:
     description: image to use for terraform runs
     type: string
@@ -226,13 +226,13 @@ jobs:
       - setup_remote_docker
       - set-environment:
           source-env: op.nonprod.env
-          cluster: sandbox-us-east-2
+          cluster: non-prod-us-east-2
       - run:
           name: install requirements
           command: pip install -r requirements.txt
       - run:
           name: update datadog eks-base dashboard
-          command: bash scripts/deploy_dashboard.sh sandbox-us-east-2
+          command: bash scripts/deploy_dashboard.sh non-prod-us-east-2
 
   # replace the oldest 1/4 of the nodes in the cluster
   replace-nodes:
@@ -269,129 +269,129 @@ jobs:
 workflows:
   version: 2
 
-  deploy eks-base to sandbox-us-east-2:
+  deploy eks-base to non-prod-us-east-2:
     jobs:
       - terraform/plan:
-          name: sandbox-us-east-2 change plan
+          name: non-prod-us-east-2 change plan
           context: << pipeline.parameters.context >>
           shell: op run --env-file op.nonprod.env -- /bin/bash -eo pipefail
-          workspace: sandbox-us-east-2
+          workspace: non-prod-us-east-2
           terraform-version: << pipeline.parameters.terraform-version >>
           before-terraform:
             - set-environment:
-                cluster: sandbox-us-east-2
+                cluster: non-prod-us-east-2
                 source-env: op.nonprod.env
           filters: *on-push-main
 
-      - approve sandbox-us-east-2 changes:
+      - approve non-prod-us-east-2 changes:
           type: approval
           requires:
-            - sandbox-us-east-2 change plan
+            - non-prod-us-east-2 change plan
           filters: *on-push-main
 
       - terraform/apply:
-          name: apply sandbox-us-east-2 changes
+          name: apply non-prod-us-east-2 changes
           context: << pipeline.parameters.context >>
           shell: op run --env-file op.nonprod.env -- /bin/bash -eo pipefail
-          workspace: sandbox-us-east-2
+          workspace: non-prod-us-east-2
           terraform-version: << pipeline.parameters.terraform-version >>
           before-terraform:
             - set-environment:
-                cluster: sandbox-us-east-2
+                cluster: non-prod-us-east-2
                 source-env: op.nonprod.env
           after-terraform-init:
             - taint-node-group:
                 node-group: group-a
           after-terraform:
             - store-system-credentials:
-                cluster: sandbox-us-east-2
+                cluster: non-prod-us-east-2
             - kube/packages:
                 use-sudo: true
                 kubectl-version: 1.23.5
             - run:
                 name: create lab-system namespace
                 command: |
-                  export KUBECONFIG=kubeconfig_sandbox-us-east-2
+                  export KUBECONFIG=kubeconfig_non-prod-us-east-2
                   kubectl apply -f lab-system-namespace.yaml
             - do/circle-deploy
             - do/slack-webhook:
-                message: lab-platform-eks-base sandbox-us-east-2 deployment
+                message: lab-platform-eks-base non-prod-us-east-2 deployment
                 webhook-url: $LAB_EVENTS_CHANNEL_WEBHOOK
           requires:
-            - approve sandbox-us-east-2 changes
+            - approve non-prod-us-east-2 changes
           filters: *on-push-main
 
       - validate-eks:
-          name: validate sandbox-us-east-2 eks cluster
+          name: validate non-prod-us-east-2 eks cluster
           context: << pipeline.parameters.context >>
           shell: op run --env-file op.nonprod.env -- /bin/bash -eo pipefail
           source-env: op.nonprod.env
-          cluster: sandbox-us-east-2
+          cluster: non-prod-us-east-2
           requires:
-            - apply sandbox-us-east-2 changes
+            - apply non-prod-us-east-2 changes
           filters: *on-push-main
 
-  release eks-base to prod-us-east-1:
-    jobs:
-      - terraform/plan:
-          name: prod-us-east-1 change plan
-          context: << pipeline.parameters.context >>
-          shell: op run --env-file op.prod.env -- /bin/bash -eo pipefail
-          workspace: prod-us-east-1
-          terraform-version: << pipeline.parameters.terraform-version >>
-          before-terraform:
-            - set-environment:
-                cluster: prod-us-east-1
-                source-env: op.prod.env
-          filters: *on-tag-main
-
-      - approve prod-us-east-1 changes:
-          type: approval
-          requires:
-            - prod-us-east-1 change plan
-          filters: *on-tag-main
-
-      - terraform/apply:
-          name: apply prod-us-east-1 changes
-          context: << pipeline.parameters.context >>
-          shell: op run --env-file op.prod.env -- /bin/bash -eo pipefail
-          workspace: prod-us-east-1
-          terraform-version: << pipeline.parameters.terraform-version >>
-          before-terraform:
-            - set-environment:
-                cluster: prod-us-east-1
-                source-env: op.prod.env
-          after-terraform-init:
-            - taint-node-group:
-                node-group: group-a
-          after-terraform:
-            - store-system-credentials:
-                cluster: prod-us-east-1
-            - kube/packages:
-                use-sudo: true
-                kubectl-version: 1.23.5
-            - run:
-                name: create lab-system namespace
-                command: |
-                  export KUBECONFIG=kubeconfig_prod-us-east-1
-                  kubectl apply -f lab-system-namespace.yaml
-            - do/circle-deploy
-            - do/slack-webhook:
-                message: lab-platform-eks-base prod-us-east-1 release
-                webhook-url: $LAB_EVENTS_CHANNEL_WEBHOOK
-          requires:
-            - approve prod-us-east-1 changes
-          filters: *on-tag-main
-
-      - validate-eks:
-          name: validate prod-us-east-1 eks cluster
-          context: << pipeline.parameters.context >>
-          shell: op run --env-file op.prod.env -- /bin/bash -eo pipefail
-          source-env: op.prod.env
-          cluster: prod-us-east-1
-          requires:
-            - apply prod-us-east-1 changes
-          filters: *on-tag-main
+#  release eks-base to prod-us-east-1:
+#    jobs:
+#      - terraform/plan:
+#          name: prod-us-east-1 change plan
+#          context: << pipeline.parameters.context >>
+#          shell: op run --env-file op.prod.env -- /bin/bash -eo pipefail
+#          workspace: prod-us-east-1
+#          terraform-version: << pipeline.parameters.terraform-version >>
+#          before-terraform:
+#            - set-environment:
+#                cluster: prod-us-east-1
+#                source-env: op.prod.env
+#          filters: *on-tag-main
+#
+#      - approve prod-us-east-1 changes:
+#          type: approval
+#          requires:
+#            - prod-us-east-1 change plan
+#          filters: *on-tag-main
+#
+#      - terraform/apply:
+#          name: apply prod-us-east-1 changes
+#          context: << pipeline.parameters.context >>
+#          shell: op run --env-file op.prod.env -- /bin/bash -eo pipefail
+#          workspace: prod-us-east-1
+#          terraform-version: << pipeline.parameters.terraform-version >>
+#          before-terraform:
+#            - set-environment:
+#                cluster: prod-us-east-1
+#                source-env: op.prod.env
+#          after-terraform-init:
+#            - taint-node-group:
+#                node-group: group-a
+#          after-terraform:
+#            - store-system-credentials:
+#                cluster: prod-us-east-1
+#            - kube/packages:
+#                use-sudo: true
+#                kubectl-version: 1.23.5
+#            - run:
+#                name: create lab-system namespace
+#                command: |
+#                  export KUBECONFIG=kubeconfig_prod-us-east-1
+#                  kubectl apply -f lab-system-namespace.yaml
+#            - do/circle-deploy
+#            - do/slack-webhook:
+#                message: lab-platform-eks-base prod-us-east-1 release
+#                webhook-url: $LAB_EVENTS_CHANNEL_WEBHOOK
+#          requires:
+#            - approve prod-us-east-1 changes
+#          filters: *on-tag-main
+#
+#      - validate-eks:
+#          name: validate prod-us-east-1 eks cluster
+#          context: << pipeline.parameters.context >>
+#          shell: op run --env-file op.prod.env -- /bin/bash -eo pipefail
+#          source-env: op.prod.env
+#          cluster: prod-us-east-1
+#          requires:
+#            - apply prod-us-east-1 changes
+#          filters: *on-tag-main
 
   # generate release notes:
   #   jobs:
@@ -402,39 +402,39 @@ workflows:
   #         on-tag: true
   #         filters: *on-tag-main
 
-  update monitors:
-    jobs:
-      - update-monitors:
-          name: update sandbox-us-east-2 monitors
-          context: << pipeline.parameters.context >>
-          shell: op run --env-file op.nonprod.env -- /bin/bash -eo pipefail
-          source-env: op.nonprod.env
-          cluster: sandbox-us-east-2
-          filters: *on-push-main
+#  update monitors:
+#    jobs:
+#      - update-monitors:
+#          name: update non-prod-us-east-2 monitors
+#          context: << pipeline.parameters.context >>
+#          shell: op run --env-file op.nonprod.env -- /bin/bash -eo pipefail
+#          source-env: op.nonprod.env
+#          cluster: non-prod-us-east-2
+#          filters: *on-push-main
+#
+#      - approve prod-us-east-1 monitors:
+#          type: approval
+#          requires:
+#            - update non-prod-us-east-2 monitors
+#          filters: *on-push-main
+#
+#      - update-monitors:
+#          name: update prod-us-east-1 monitors
+#          context: << pipeline.parameters.context >>
+#          shell: op run --env-file op.prod.env -- /bin/bash -eo pipefail
+#          source-env: op.prod.env
+#          cluster: prod-us-east-1
+#          requires:
+#            - approve prod-us-east-1 monitors
+#          filters: *on-push-main
 
-      - approve prod-us-east-1 monitors:
-          type: approval
-          requires:
-            - update sandbox-us-east-2 monitors
-          filters: *on-push-main
-
-      - update-monitors:
-          name: update prod-us-east-1 monitors
-          context: << pipeline.parameters.context >>
-          shell: op run --env-file op.prod.env -- /bin/bash -eo pipefail
-          source-env: op.prod.env
-          cluster: prod-us-east-1
-          requires:
-            - approve prod-us-east-1 monitors
-          filters: *on-push-main
-
-  update dashboard:
-    jobs:
-      - update-dashboard:
-          name: update dashboard
-          context: << pipeline.parameters.context >>
-          shell: op run --env-file op.prod.env -- /bin/bash -eo pipefail
-          filters: *on-push-main
+#  update dashboard:
+#    jobs:
+#      - update-dashboard:
+#          name: update dashboard
+#          context: << pipeline.parameters.context >>
+#          shell: op run --env-file op.prod.env -- /bin/bash -eo pipefail
+#          filters: *on-push-main
 
   nightly-node-replacements:
     triggers:
@@ -446,42 +446,42 @@ workflows:
                 - main
     jobs:
       - replace-nodes:
-          name: nightly node replacement job on sandbox-us-east-2
+          name: nightly node replacement job on non-prod-us-east-2
           context: << pipeline.parameters.context >>
-          cluster: sandbox-us-east-2
+          cluster: non-prod-us-east-2
           source-env: op.nonprod.env
-      - replace-nodes:
-          name: nightly node replacement job on prod-us-east-1
-          context: << pipeline.parameters.context >>
-          cluster: prod-us-east-1
-          source-env: op.prod.env
-          requires:
-            - nightly node replacement job on sandbox-us-east-2
+#      - replace-nodes:
+#          name: nightly node replacement job on prod-us-east-1
+#          context: << pipeline.parameters.context >>
+#          cluster: prod-us-east-1
+#          source-env: op.prod.env
+#          requires:
+#            - nightly node replacement job on non-prod-us-east-2
 
 
   # perform the pipeline health checks and compare desired eks component verions with current release versions
-  nightly-validation:
-    triggers:
-      - schedule:
-          cron: "0 0 * * *"
-          filters:
-            branches:
-              only:
-                - main
-    jobs:
-      - update-dashboard:
-          name: update dashboard
-          shell: op run --env-file op.nonprod.env -- /bin/bash -eo pipefail
-          context: << pipeline.parameters.context >>
-      - validate-eks:
-          name: validate sandbox-us-east-2 eks cluster
-          context: << pipeline.parameters.context >>
-          shell: op run --env-file op.nonprod.env -- /bin/bash -eo pipefail
-          source-env: op.nonprod.env
-          cluster: sandbox-us-east-2
-      - validate-eks:
-          name: validate prod-us-east-1 eks cluster
-          context: << pipeline.parameters.context >>
-          shell: op run --env-file op.prod.env -- /bin/bash -eo pipefail
-          source-env: op.prod.env
-          cluster: prod-us-east-1
+#  nightly-validation:
+#    triggers:
+#      - schedule:
+#          cron: "0 0 * * *"
+#          filters:
+#            branches:
+#              only:
+#                - main
+#    jobs:
+#      - update-dashboard:
+#          name: update dashboard
+#          shell: op run --env-file op.nonprod.env -- /bin/bash -eo pipefail
+#          context: << pipeline.parameters.context >>
+#      - validate-eks:
+#          name: validate non-prod-us-east-2 eks cluster
+#          context: << pipeline.parameters.context >>
+#          shell: op run --env-file op.nonprod.env -- /bin/bash -eo pipefail
+#          source-env: op.nonprod.env
+#          cluster: non-prod-us-east-2
+##      - validate-eks:
+##          name: validate prod-us-east-1 eks cluster
+##          context: << pipeline.parameters.context >>
+##          shell: op run --env-file op.prod.env -- /bin/bash -eo pipefail
+##          source-env: op.prod.env
+##          cluster: prod-us-east-1
