@@ -1,5 +1,8 @@
 #File non-prod-us-east-2.auto.tfvars.json
 - last 4 lines are not changed.
 
+#removed this line from non-prod-us-east-2.auto.tfvars.json
+- "oidc_client_id": "{{ op://empc-lab/svc-auth0/dev-twdpsio-dev-dpsctl-client-id }}",
+
 #File main.tf 
 - code commented related to auth provider line 52
