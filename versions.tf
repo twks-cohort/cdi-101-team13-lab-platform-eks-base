@@ -3,6 +3,7 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
+      version = "5.10.0"
     }
   }
 
@@ -16,7 +17,6 @@ terraform {
 }
 
 provider "aws" {
-  version = "5.10.0"
   region = var.aws_region
   assume_role {
     role_arn     = local.authentication_role
